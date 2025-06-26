@@ -1,6 +1,7 @@
 package com.example.sechay.controller;
 
 
+import com.example.sechay.dto.EmployeeDetailsDto;
 import com.example.sechay.model.Employee;
 import com.example.sechay.model.LeaveRequest;
 import com.example.sechay.model.PaySlips;
@@ -8,6 +9,7 @@ import com.example.sechay.service.EmployeeDetail;
 import com.example.sechay.service.EmployeeService;
 import com.example.sechay.service.LeaveService;
 import com.example.sechay.service.PaySlipService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -17,11 +19,15 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/employee")
 @PreAuthorize("hasRole('EMPLOYEE')")
+@Tag(name = "3 - Employee Controller")
 public class EmpController {
 
     private final EmployeeService employeeService;
@@ -51,16 +57,20 @@ public class EmpController {
         return ResponseEntity.ok(employeeService.getProfile(empEmail));
     }
 
+
     @PutMapping("/profile/update/{empId}")
-    public ResponseEntity<?> updateProfile(@PathVariable int empId,@RequestBody Employee employee,Authentication authentication){
+    public ResponseEntity<?> updateProfile(@PathVariable int empId, @RequestBody EmployeeDetailsDto employeeDetailsDto, Authentication authentication){
         String loggedInEmp=authentication.getName();
         System.out.println("LoggedInEmp:"+loggedInEmp);
         Employee employee1=employeeService.getProfile(loggedInEmp);
         if(employee1==null || employee1.getEmpId()!=empId){
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied: You can't edit other's profile");
         }
-        employee.setEmpId(empId);
-        Employee updatedEmp=employeeService.updateProfile(employee);
+        if(!employeeDetailsDto.getEmpNewPassword().equals(employeeDetailsDto.getEmpConfirmPassword())){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("New Password and Confirm Password Should be Same.");
+        }
+        Employee updatedEmp=employeeService.updateProfile(empId,employeeDetailsDto);
+
         return ResponseEntity.status(HttpStatus.OK).body("Profile Updated.");
     }
 
@@ -107,15 +117,27 @@ public class EmpController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
         }
         List<PaySlips> paySlipsList=paySlipService.getPaySlipsForEmployee(loggedInEmp);
-        return ResponseEntity.status(HttpStatus.FOUND).body(paySlipsList);
+        return ResponseEntity.status(HttpStatus.OK).body(paySlipsList);
     }
 
-    @GetMapping("/payslips/{pId}")
-    public ResponseEntity<?> downloadPaySlip(@PathVariable Integer pId){
-        return paySlipService.getPaySlipsById(pId).map(p->ResponseEntity.ok().
-                header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\""+ p.getFileName()+"\"")
-                .contentType(MediaType.parseMediaType(p.getContentType()))
-                .body(p.getData()))
-                .orElse(ResponseEntity.notFound().build());
+    @GetMapping("/payslips/base64/{pId}")
+    public ResponseEntity<?> downloadPayslipBase64(@PathVariable Integer pId, Authentication authentication) {
+        String loggedInEmp = authentication.getName();
+        Employee employee = employeeService.getProfile(loggedInEmp);
+
+        return paySlipService.getPaySlipsById(pId).map(p -> {
+            if (!p.getEmployee().getEmpEmail().equalsIgnoreCase(loggedInEmp)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied");
+            }
+
+            String base64 = Base64.getEncoder().encodeToString(p.getData());
+            Map<String, Object> result = new HashMap<>();
+            result.put("fileName", p.getFileName());
+            result.put("contentType", p.getContentType());
+            result.put("base64", base64);
+
+            return ResponseEntity.ok(result);
+        }).orElse(ResponseEntity.notFound().build());
     }
+
 }

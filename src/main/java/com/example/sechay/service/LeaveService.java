@@ -26,8 +26,7 @@ public class LeaveService {
     }
     public boolean cancelLeave(int leaveId,String empEmail){
         LeaveRequest leaveRequest1=leaveRepo.findById(leaveId).orElse(null);
-        if(leaveRequest1!=null && leaveRequest1.getEmployee().getEmpEmail().equals(empEmail)
-                && leaveRequest1.getLeaveStatus().equals("PENDING")){
+        if(leaveRequest1!=null && leaveRequest1.getEmployee().getEmpEmail().equals(empEmail)){
             leaveRepo.delete(leaveRequest1);
             return true;
         }

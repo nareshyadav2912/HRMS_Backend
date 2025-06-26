@@ -1,6 +1,7 @@
 package com.example.sechay.controller;
 
 
+import com.example.sechay.dto.HREmployeeDto;
 import com.example.sechay.model.Employee;
 import com.example.sechay.model.LeaveRequest;
 import com.example.sechay.model.LeaveStatus;
@@ -8,6 +9,8 @@ import com.example.sechay.model.PaySlips;
 import com.example.sechay.service.EmployeeService;
 import com.example.sechay.service.LeaveService;
 import com.example.sechay.service.PaySlipService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,10 +20,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/hr")
 @PreAuthorize("hasRole('HR')")
+@SecurityRequirement(name = "bearerAuth")
+@Tag(name = "2 - HR Controller")
 public class HRController {
 
     @Autowired
@@ -33,11 +40,17 @@ public class HRController {
     PaySlipService paySlipService;
 
     @PostMapping("/addEmployee")
-    public ResponseEntity<?> addEmployee(@RequestBody Employee employee){
+    public ResponseEntity<?> addEmployee(@RequestBody HREmployeeDto hrEmployeeDto){
         Employee employee1=null;
         try{
-            employee1=employeeService.addEmployee(employee);
-            return new ResponseEntity<>(employee1, HttpStatus.CREATED);
+            String emailRegex="^[a-zA-Z]+\\.([a-zA-Z]+)@sechay\\.com$";
+            Pattern pattern=Pattern.compile(emailRegex);
+            Matcher matcher=pattern.matcher(hrEmployeeDto.getEmpEmail());
+            if(!matcher.matches()){
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Please enter Valid organization email!!");
+            }
+            employee1=employeeService.addEmployee(hrEmployeeDto);
+            return new ResponseEntity<>(employee1, HttpStatus.OK);
         }catch (Exception e){
             return new ResponseEntity<>(e.getMessage(),HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -50,7 +63,7 @@ public class HRController {
     public ResponseEntity<Employee> getEmployeeById(@PathVariable int empId){
         Employee employee= employeeService.getEmployeeById(empId);
         if(employee!=null){
-            return new ResponseEntity<>(employee,HttpStatus.FOUND);
+            return new ResponseEntity<>(employee,HttpStatus.OK);
         }else{
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
@@ -100,7 +113,7 @@ public class HRController {
         if(leaveRequestList.isEmpty()){
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No requests found for"+parsedStatus);
         }
-        return ResponseEntity.status(HttpStatus.FOUND).body(leaveRequestList);
+        return ResponseEntity.status(HttpStatus.OK).body(leaveRequestList);
     }
 
     @PostMapping("/payslips/upload/{empEmail}")

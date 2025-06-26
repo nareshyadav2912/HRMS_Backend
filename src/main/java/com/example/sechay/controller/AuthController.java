@@ -1,8 +1,10 @@
 package com.example.sechay.controller;
 
+import com.example.sechay.dto.LoginRequest;
 import com.example.sechay.model.Employee;
 import com.example.sechay.service.EmployeeService;
 import com.example.sechay.service.JwtService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Base64;
 import java.util.Map;
 
+@Tag(name = "1 - Auth")
 @RestController
 public class AuthController {
     @Autowired
@@ -32,22 +35,20 @@ public class AuthController {
     }
 
     @PostMapping("/authenticate")
-    public ResponseEntity<?> authenticate(HttpServletRequest request){
-        String header=request.getHeader("Authorization");
-        if(header==null || !header.startsWith("Basic ")){
-            return ResponseEntity.badRequest().body("Missing Credentials");
-        }
-        String base64Credentials=header.substring("Basic ".length());
-        byte[] decode= Base64.getDecoder().decode(base64Credentials);
-        String[] credentials=new String(decode).split(":",2);
-        String empEmail=credentials[0];
-        String empPassword=credentials[1];
-        Authentication authentication=authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(empEmail,empPassword));
-        if(authentication.isAuthenticated()){
-            return ResponseEntity.ok(Map.of("jwt",jwtService.generateToken(empEmail)));
-        }
-        else {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid Credentials,Authentication Failed");
+    public ResponseEntity<?> authenticate(@RequestBody LoginRequest request) {
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmpEmail(), request.getEmpPassword())
+            );
+
+            if (authentication.isAuthenticated()) {
+                String token = jwtService.generateToken(request.getEmpEmail());
+                return ResponseEntity.ok(Map.of("jwt", token));
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Authentication failed");
         }
     }
 
