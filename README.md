@@ -31,9 +31,5 @@ A Spring Boot-based Human Resource Management System (HRMS) backend providing se
 
 ---
 
-## 🚀 Run the Project
 
-### 1. Build
 
-```bash
-mvn clean install
